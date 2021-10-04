@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Weather Map Project</title>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v2.4.1/mapbox-gl.css' rel='stylesheet'>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.0/dist/css/bootstrap.min.css" integrity="sha384-B0vP5xmATw1+K9KRQjQERJvTumQW0nPEzvF6L/Z6nronJ3oUOFUFpCjEUQouq2+l" crossorigin="anonymous">
+    <link href='css/weather_map_style.css' rel="stylesheet">
+</head>
+<body>
+    <div id="container">
+        <div class="heading bg-primary text-light mb-4" style="height: 6rem;">
+            <h1 class=>Weather Map</h1>
+            <div id="inputPlace">
+                <label for="enterLoc">Enter Location</label>
+                <input id="enterLoc">
+                <button id="search" type="submit">Search</button>
+            </div>
+        </div>
+        <div id="location" class="px-4"></div>
+        <div id="content" class="d-flex mx-auto mb-3"></div>
+        <div id="map" class="mx-auto"></div>
+
+        <script src='https://api.mapbox.com/mapbox-gl-js/v2.4.1/mapbox-gl.js'></script>
+        <script src="js/mapbox-geocoder-utils.js"></script>
+        <script src="https://code.jquery.com/jquery-2.2.4.min.js" integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44=" crossorigin="anonymous"></script>
+        <script src="js/keys.js"></script>
+        <script>
+
+            mapboxgl.accessToken = MAPBOX_API_TOKEN;
+            var map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/satellite-streets-v11',
+                center: [-98.4916, 29.4252],
+                zoom: 10
+
+            });
+
+
+            var dropMarker = new mapboxgl.Marker({
+                draggable: true
+            })  .setLngLat([-98.4916, 29.4252])
+                .addTo(map);
+
+            var markerPopup = new mapboxgl.Popup()
+                .setHTML("<h5>Click and drag marker</h5>");
+
+            dropMarker.setPopup(markerPopup);
+
+
+
+
+            function onDragEnd() {
+                var lngLat = dropMarker.getLngLat();
+                markerPopup.setHTML(`Longitude: ${lngLat.lng}<br />Latitude: ${lngLat.lat}`);
+                weather(lngLat.lat, lngLat.lng)
+            }
+
+            $('#search').on('click', search );
+            $('#enterLoc').on('keyup', function(e) {
+                   if(e.keyCode === 13) {
+                       search();
+                   }
+            });
+
+            function search() {
+                geocode($('#enterLoc').val(), MAPBOX_API_TOKEN).then(function(result) {
+
+                    map.setCenter(result);
+                    map.setZoom(10);
+                    weather(result[1], result[0]);
+                });
+            }
+
+            dropMarker.on('dragend', onDragEnd);
+
+            function weather(latitude, longitude) {
+                latitude = latitude || 29.4252;
+                longitude = longitude || -98.4916;
+                // This function takes a number between 0 and 360 and returns a
+                // wind direction abbreviation. the MapBox API gives us a "wind degrees" datum
+                // this takes the "wind degrees" and converts it into a familiar abbreviation
+                function windCardinalDirection(degrees) {
+                    let cardinalDirection = '';
+                    if ((degrees > 348.75 && degrees <= 360) || (degrees >= 0 && degrees <= 11.25)) {
+                        cardinalDirection = "N";
+                    } else if (degrees > 11.25 && degrees <= 33.75) {
+                        cardinalDirection = "NNE";
+                    } else if (degrees > 33.75 && degrees <= 56.25) {
+                        cardinalDirection = "NE";
+                    } else if (degrees > 56.25 && degrees <= 78.75) {
+                        cardinalDirection = "ENE";
+                    } else if (degrees > 78.75 && degrees <= 101.25) {
+                        cardinalDirection = "E";
+                    } else if (degrees > 101.25 && degrees <= 123.75) {
+                        cardinalDirection = "ESE";
+                    } else if (degrees > 123.75 && degrees <= 146.25) {
+                        cardinalDirection = "SE";
+                    } else if (degrees > 146.25 && degrees <= 168.75) {
+                        cardinalDirection = "SSE";
+                    } else if (degrees > 168.75 && degrees <= 191.25) {
+                        cardinalDirection = "S";
+                    } else if (degrees > 191.25 && degrees <= 213.75) {
+                        cardinalDirection = "SSW";
+                    } else if (degrees > 213.75 && degrees <= 236.25) {
+                        cardinalDirection = "SW";
+                    } else if (degrees > 236.25 && degrees <= 258.75) {
+                        cardinalDirection = "WSW";
+                    } else if (degrees > 258.75 && degrees <= 281.25) {
+                        cardinalDirection = "W";
+                    } else if (degrees > 281.25 && degrees <= 303.75) {
+                        cardinalDirection = "WNW";
+                    } else if (degrees > 303.75 && degrees <= 326.25) {
+                        cardinalDirection = "NW";
+                    } else if (degrees > 326.75 && degrees <= 348.75) {
+                        cardinalDirection = "NNW";
+                    }
+                    return cardinalDirection;
+                }
+
+                $.get('https://api.openweathermap.org/data/2.5/onecall', {
+                    appid: WEATHER_APP_ID,
+                    lat: latitude,
+                    lon: longitude,
+                    units: 'imperial'
+                }).done(function (data) {
+                    console.log(data);
+                    $('.day-card').remove();
+                    $('.currentLoc').remove();
+                    dropMarker.setLngLat([longitude, latitude]);
+                    reverseGeocode({lng: longitude, lat: latitude}, MAPBOX_API_TOKEN).then(function(results) {
+                        $('#location').append('<h3 class="currentLoc">' + 'Current Location: ' + results + '<h3>');
+
+                    });
+
+                    data.daily.forEach(function (day, index) {
+                        if (index > 4) {
+
+                        } else {
+                            var wind = data.daily[index].wind_deg;
+
+                            var labelsAndValues = [
+                                {text: 'Daytime Temp', value: data.daily[index].temp.day + '&deg; F'},
+                                {text: 'Low', value: data.daily[index].temp.min + '&deg; F'},
+                                {text: 'High', value: data.daily[index].temp.max + '&deg; F'},
+                                {text: 'Description', value: data.daily[index].weather[0].description},
+                                {text: 'Humidity', value: data.daily[index].humidity + '%'},
+                                {text: 'Wind', value: data.daily[index].wind_speed + ' mph ' + windCardinalDirection(wind)},
+                                {text: 'Pressure', value: data.daily[index].pressure},
+
+                            ];
+
+                            var dataHtml = labelsAndValues.map(function (item) {
+                                return `
+                                    <div class="mb-2">
+                                        <div class="day-card-label">${item.text}</div>
+                                        <div class="font-weight-bold">${item.value}</div>
+                                    </div>
+                                `
+                            }).join('');
+
+                            var regularDate = new Date(data.daily[index].dt * 1000);
+                            var formattedDate = (String(regularDate)).substring(0, 15)
+
+                            $('#content').append(`
+                                <div class="day-card border rounded p-2">
+                                    <div class="font-weight-bold">${formattedDate}</div>
+                                    <hr>
+                                    <img src="img/${data.daily[index].weather[0].icon}.png">
+                                    ${dataHtml}
+                                </div>
+                            `)
+                        }
+                    });
+                }).fail(function (error) {
+                    console.log(error);
+                });
+            }
+
+            weather();
+
+
+        </script>
+    </div>
+</body>
+</html>
